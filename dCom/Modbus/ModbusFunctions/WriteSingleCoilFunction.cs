@@ -24,15 +24,52 @@ namespace Modbus.ModbusFunctions
         /// <inheritdoc />
         public override byte[] PackRequest()
         {
-            //TO DO: IMPLEMENT
-            throw new NotImplementedException();
+            ModbusWriteCommandParameters parameters = (ModbusWriteCommandParameters)CommandParameters;
+
+            byte[] request = new byte[12];
+            ushort coilValue = parameters.Value == 0 ? (ushort)0x0000 : (ushort)0xFF00;
+
+            request[0] = (byte)(parameters.TransactionId >> 8);
+            request[1] = (byte)(parameters.TransactionId & 0xFF);
+
+            request[2] = 0;
+            request[3] = 0;
+
+            request[4] = (byte)(parameters.Length >> 8);
+            request[5] = (byte)(parameters.Length & 0xFF);
+
+            request[6] = parameters.UnitId;
+            request[7] = parameters.FunctionCode;
+
+            request[8] = (byte)(parameters.OutputAddress >> 8);
+            request[9] = (byte)(parameters.OutputAddress & 0xFF);
+
+            request[10] = (byte)(coilValue >> 8);
+            request[11] = (byte)(coilValue & 0xFF);
+
+            return request;
         }
 
         /// <inheritdoc />
         public override Dictionary<Tuple<PointType, ushort>, ushort> ParseResponse(byte[] response)
         {
-            //TO DO: IMPLEMENT
-            throw new NotImplementedException();
+            Dictionary<Tuple<PointType, ushort>, ushort> result = new Dictionary<Tuple<PointType, ushort>, ushort>();
+            ModbusWriteCommandParameters parameters = (ModbusWriteCommandParameters)CommandParameters;
+
+            byte functionCode = response[7];
+
+            if ((functionCode & 0x80) != 0)
+            {
+                HandeException(response[8]);
+            }
+
+            ushort value = (ushort)(((response[10] << 8) | response[11]) == 0xFF00 ? 1 : 0);
+
+            result.Add(
+                new Tuple<PointType, ushort>(PointType.DIGITAL_OUTPUT, parameters.OutputAddress),
+                value);
+
+            return result;
         }
     }
 }

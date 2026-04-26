@@ -24,15 +24,58 @@ namespace Modbus.ModbusFunctions
         /// <inheritdoc />
         public override byte[] PackRequest()
         {
-            //TO DO: IMPLEMENT
-            throw new NotImplementedException();
+            ModbusReadCommandParameters parameters = (ModbusReadCommandParameters)CommandParameters;
+
+            byte[] request = new byte[12];
+
+            request[0] = (byte)(parameters.TransactionId >> 8);
+            request[1] = (byte)(parameters.TransactionId & 0xFF);
+
+            request[2] = 0;
+            request[3] = 0;
+
+            request[4] = (byte)(parameters.Length >> 8);
+            request[5] = (byte)(parameters.Length & 0xFF);
+
+            request[6] = parameters.UnitId;
+            request[7] = parameters.FunctionCode;
+
+            request[8] = (byte)(parameters.StartAddress >> 8);
+            request[9] = (byte)(parameters.StartAddress & 0xFF);
+
+            request[10] = (byte)(parameters.Quantity >> 8);
+            request[11] = (byte)(parameters.Quantity & 0xFF);
+
+            return request;
         }
 
         /// <inheritdoc />
         public override Dictionary<Tuple<PointType, ushort>, ushort> ParseResponse(byte[] response)
         {
-            //TO DO: IMPLEMENT
-            throw new NotImplementedException();
+            Dictionary<Tuple<PointType, ushort>, ushort> result = new Dictionary<Tuple<PointType, ushort>, ushort>();
+            ModbusReadCommandParameters parameters = (ModbusReadCommandParameters)CommandParameters;
+
+            byte functionCode = response[7];
+
+            if ((functionCode & 0x80) != 0)
+            {
+                HandeException(response[8]);
+            }
+
+            ushort startAddress = parameters.StartAddress;
+            ushort quantity = parameters.Quantity;
+
+            for (int i = 0; i < quantity; i++)
+            {
+                int dataIndex = 9 + (i * 2);
+                ushort value = (ushort)((response[dataIndex] << 8) | response[dataIndex + 1]);
+
+                result.Add(
+                    new Tuple<PointType, ushort>(PointType.ANALOG_OUTPUT, (ushort)(startAddress + i)),
+                    value);
+            }
+
+            return result;
         }
     }
 }
