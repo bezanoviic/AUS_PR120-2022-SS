@@ -1,5 +1,6 @@
 ﻿using Common;
 using System;
+using System.Collections.Generic;
 using System.Threading;
 
 namespace ProcessingModule
@@ -52,11 +53,50 @@ namespace ProcessingModule
 		}
 
         /// <summary>
-        /// Acquisitor thread logic.
+        /// Periodicno ocitavanje podataka sa Modbus uredjaja.
+        /// U posebnoj niti salje read komande za sve tacke
+        /// u zavisnosti od njihovog intervala ocitavanja.
         /// </summary>
-		private void Acquisition_DoWork()
-		{
-            //TO DO: IMPLEMENT
+        private void Acquisition_DoWork()
+        {
+            try
+            {
+                while (true)
+                {
+                    Thread.Sleep(1000);
+
+                    List<IConfigItem> configItems = configuration.GetConfigurationItems();
+
+                    foreach (IConfigItem configItem in configItems)
+                    {
+                        configItem.SecondsPassedSinceLastPoll++;
+
+                        if (configItem.SecondsPassedSinceLastPoll >= configItem.AcquisitionInterval)
+                        {
+                            ushort transactionId = configuration.GetTransactionId();
+                            byte unitAddress = configuration.UnitAddress;
+                            ushort startAddress = configItem.StartAddress;
+                            ushort numberOfRegisters = configItem.NumberOfRegisters;
+
+                            processingManager.ExecuteReadCommand(
+                                configItem,
+                                transactionId,
+                                unitAddress,
+                                startAddress,
+                                numberOfRegisters);
+
+                            configItem.SecondsPassedSinceLastPoll = 0;
+                        }
+                    }
+                }
+            }
+            catch (ThreadAbortException)
+            {
+            }
+            catch (Exception ex)
+            {
+                stateUpdater.LogMessage(ex.Message);
+            }
         }
 
         #endregion Private Methods
